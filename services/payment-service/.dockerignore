@@ -1,0 +1,6 @@
+.env
+.git
+Dockerfile
+.dockerignore
+*.md
+**/*_test.go

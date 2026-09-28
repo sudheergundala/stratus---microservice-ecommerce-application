@@ -1,0 +1,11 @@
+notes.md
+
+# secrets
+.env
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
