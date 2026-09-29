@@ -9,3 +9,7 @@ notes.md
 .DS_Store
 .idea/
 .vscode/
+
+# Node.js
+node_modules/
+dist/
