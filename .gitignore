@@ -13,3 +13,6 @@ notes.md
 # Node.js
 node_modules/
 dist/
+
+# Java / Maven
+target/

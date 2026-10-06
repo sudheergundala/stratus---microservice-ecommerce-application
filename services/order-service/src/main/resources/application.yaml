@@ -1,0 +1,36 @@
+# All environment-specific values come from environment variables.
+spring:
+  application:
+    name: order-service
+  main:
+    banner-mode: "off"
+  lifecycle:
+    timeout-per-shutdown-phase: ${SHUTDOWN_TIMEOUT:20s}
+
+server:
+  port: ${PORT:8082}
+  shutdown: graceful
+
+payment:
+  url: ${PAYMENT_SERVICE_URL}
+  timeout: ${PAYMENT_TIMEOUT:2s}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        liveness:
+          additional-path: "server:/healthz"
+        readiness:
+          additional-path: "server:/readyz"
+
+logging:
+  structured:
+    format:
+      console: ecs
