@@ -14,6 +14,7 @@ using Npgsql;
 using UserService.Auth;
 using UserService.Data;
 using Xunit;
+using System.Net.Sockets;
 
 namespace UserService.Tests;
 
@@ -164,5 +165,14 @@ public sealed class AuthApiTests : IDisposable
         var jwks = await _client.GetAsync("/.well-known/jwks.json");
         Assert.True(jwks.Headers.CacheControl?.Public);
         Assert.Equal(TimeSpan.FromMinutes(5), jwks.Headers.CacheControl?.MaxAge);
+    }
+        [Fact]
+    public async Task Wrapped_database_failure_returns_503()
+    {
+        // What a real outage looks like: EF's retry wrapper -> Npgsql -> socket error.
+        _store.Fail = new InvalidOperationException("retry limit exceeded",
+            new NpgsqlException("failed to connect", new SocketException((int)SocketError.ConnectionRefused)));
+        var response = await Login("ada@example.com");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 }

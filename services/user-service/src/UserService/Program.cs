@@ -104,12 +104,26 @@ app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
     var (status, message) = error switch
     {
         BadHttpRequestException bad => (bad.StatusCode, "invalid request"),
-        _ when error?.GetBaseException() is NpgsqlException or TimeoutException => (503, "user store unavailable; retry"),
+        _ when IsDatabaseUnavailable(error) => (503, "user store unavailable; retry"),
         _ => (500, "internal error"),
     };
     context.Response.StatusCode = status;
     await context.Response.WriteAsJsonAsync(new { error = message });
 }));
+
+// Walks the whole exception chain: EF wraps Npgsql errors (retries exhausted),
+// and Npgsql wraps socket errors (connection refused, DNS failure).
+static bool IsDatabaseUnavailable(Exception? error)
+{
+    for (var e = error; e is not null; e = e.InnerException)
+    {
+        if (e is NpgsqlException or TimeoutException)
+        {
+            return true;
+        }
+    }
+    return false;
+}
 app.UseRequestTimeouts();
 
 // Readiness fails once shutdown starts, so load balancers stop sending traffic.

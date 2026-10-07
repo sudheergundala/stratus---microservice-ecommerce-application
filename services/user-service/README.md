@@ -27,7 +27,7 @@ Passwords: PBKDF2 via ASP.NET Core Identity's `PasswordHasher`; minimum 12 chara
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ConnectionStrings__UsersDb` | *(required)* | Npgsql connection string, e.g. `Host=postgres;Database=users;Username=…;Password=…;Timeout=3` |
+| `ConnectionStrings__UsersDb` | *(required)* | Npgsql connection string, e.g. `Host=postgres;Database=users;Username=…;Password=…;Timeout=3;GSS Encryption Mode=Disable` |
 | `JWT_PRIVATE_KEY` | *(required for the server)* | PEM RSA private key, 2048+ bits. From Secrets Manager in AWS. |
 | `JWT_ISSUER` | `stratus-user-service` | `iss` claim |
 | `JWT_AUDIENCE` | `stratus-api` | `aud` claim |
@@ -36,6 +36,7 @@ Passwords: PBKDF2 via ASP.NET Core Identity's `PasswordHasher`; minimum 12 chara
 | `REQUEST_TIMEOUT_SECONDS` | `5` | Upper bound per request; `503` when exceeded |
 | `DB_COMMAND_TIMEOUT_SECONDS` | `5` | Upper bound per SQL command |
 | `SHUTDOWN_TIMEOUT_SECONDS` | `20` | Time for in-flight requests after SIGTERM |
+
 
 Missing `ConnectionStrings__UsersDb` or an invalid `JWT_PRIVATE_KEY` stops the
 process at startup with exit code 2.
