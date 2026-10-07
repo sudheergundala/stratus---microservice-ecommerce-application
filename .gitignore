@@ -16,3 +16,10 @@ dist/
 
 # Java / Maven
 target/
+
+# --- .NET ---
+obj/
+TestResults/
+*.user
+.vs/
+bin/

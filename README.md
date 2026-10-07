@@ -5,4 +5,5 @@ Polyglot commerce platform on AWS EKS.
 Payment service - Go Language - Runs on Port 8083
 API-gateway service - NodeJS - Runs on Port 8080
 Order service - Java/Spring Boot - Runs on Port 8082
-Inventory service - Go Language - Runs on Port 8084
+Inventory service - Go Language - Runs on Port 8084 - DynamoDB
+User service - .NET - Runs on Port 8081 - PostgreSQL
