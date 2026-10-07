@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- A background worker. The Web SDK is only for the small health endpoint
+       Kubernetes probes. AWS packages are added with "dotnet add package". -->
+  <PropertyGroup>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="AWSSDK.DynamoDBv2" Version="4.0.107" />
+    <PackageReference Include="AWSSDK.SimpleEmailV2" Version="4.0.106.1" />
+    <PackageReference Include="AWSSDK.SQS" Version="4.0.100.15" />
+  </ItemGroup>
+
+</Project>
