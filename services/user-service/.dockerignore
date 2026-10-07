@@ -1,0 +1,6 @@
+# Allowlist: only what the image build needs. Tests run in CI, not in the image.
+*
+!Directory.Build.props
+!src/
+**/bin/
+**/obj/
