@@ -1,0 +1,5 @@
+*
+!Directory.Build.props
+!src/
+**/bin/
+**/obj/
