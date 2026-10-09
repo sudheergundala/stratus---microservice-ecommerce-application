@@ -1,0 +1,7 @@
+# Allowlist: only what the image needs. Tests and training stay out.
+*
+!pyproject.toml
+!uv.lock
+!app/
+!model/
+**/__pycache__/
