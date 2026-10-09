@@ -8,6 +8,7 @@ Order service - Java/Spring Boot - Runs on Port 8082
 Inventory service - Go Language - Runs on Port 8084 - DynamoDB
 User service - .NET - Runs on Port 8081 - PostgreSQL
 Notification service - .NET - Runs on Port 8087
+Fraud service - Python 3.13 + FastAPI + an ML model - Runs on Port 8086
 
 # Why distroless/Chiseled?
 For most of the services we are using distroless/chiseled images in the final stage of the image. Because these dont have OS tools, No Shell just the runtime which inturn become very small image and very secure.

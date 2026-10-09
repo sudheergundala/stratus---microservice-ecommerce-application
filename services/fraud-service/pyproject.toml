@@ -1,0 +1,30 @@
+[project]
+name = "fraud-service"
+version = "1.0.0"
+description = "Scores orders for fraud risk with a versioned model artifact."
+requires-python = ">=3.13,<3.14"
+# Runtime dependencies only: this is what ships in the image.
+dependencies = [
+    "fastapi>=0.143,<1",
+    "uvicorn>=0.54,<1",
+]
+
+[dependency-groups]
+# Tests: installed locally and in CI, never in the image.
+dev = [
+    "pytest>=9.1",
+    "httpx2>=2.13",
+]
+# Model training: scikit-learn is needed to train, not to serve.
+train = [
+    "scikit-learn>=1.9",
+    "numpy>=2.5",
+]
+
+[tool.uv]
+# An application, not a library: don't build or install it as a package.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

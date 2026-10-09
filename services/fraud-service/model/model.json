@@ -1,0 +1,62 @@
+{
+  "model_version": "fraud-lr-v1",
+  "algorithm": "logistic_regression",
+  "features": [
+    "log_amount",
+    "item_count",
+    "log_account_age_days",
+    "orders_last_24h",
+    "address_mismatch",
+    "card_country_mismatch",
+    "night_order"
+  ],
+  "mean": [
+    3.8357373,
+    4.012825,
+    5.42206592,
+    0.301475,
+    0.079,
+    0.0384,
+    0.25135
+  ],
+  "scale": [
+    0.87546297,
+    1.99945255,
+    1.25884382,
+    0.55153225,
+    0.26973876,
+    0.19215993,
+    0.43378932
+  ],
+  "coef": [
+    0.4766881,
+    0.20885474,
+    -0.68506074,
+    0.52566548,
+    0.43748718,
+    0.3550834,
+    0.31411673
+  ],
+  "intercept": -3.44348912,
+  "training": {
+    "rows": 50000,
+    "seed": 42,
+    "data": "synthetic",
+    "scikit_learn": "1.9.1"
+  },
+  "metrics": {
+    "fraud_rate": 0.0575,
+    "roc_auc": 0.8087,
+    "pr_auc": 0.3032,
+    "at_0.30": {
+      "flagged_share": 0.0293,
+      "precision": 0.4403,
+      "recall": 0.2243
+    },
+    "at_0.80": {
+      "flagged_share": 0.001,
+      "precision": 0.8,
+      "recall": 0.0139
+    }
+  }
+}

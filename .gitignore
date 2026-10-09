@@ -23,3 +23,9 @@ TestResults/
 *.user
 .vs/
 bin/
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
