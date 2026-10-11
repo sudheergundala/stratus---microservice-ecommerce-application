@@ -1,0 +1,27 @@
+[project]
+name = "catalog-service"
+version = "1.0.0"
+description = "Product catalog: browse, filter and full-text search over PostgreSQL."
+requires-python = ">=3.13,<3.14"
+# Runtime dependencies only: this is what ships in the image.
+dependencies = [
+    "fastapi>=0.143,<1",
+    "uvicorn>=0.54,<1",
+    "psycopg[binary]>=3.2,<4",
+    "psycopg-pool>=3.2,<4",
+]
+
+[dependency-groups]
+# Tests: installed locally and in CI, never in the image.
+dev = [
+    "pytest>=9.1",
+    "httpx2>=2.13",
+]
+
+[tool.uv]
+# An application, not a library: don't build or install it as a package.
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
