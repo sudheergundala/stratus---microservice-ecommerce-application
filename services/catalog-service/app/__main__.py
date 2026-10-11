@@ -1,7 +1,8 @@
 """Entry point.
 
 python -m app           serve the API (needs DATABASE_DSN, IMAGE_BASE_URL)
-python -m app migrate   apply schema migrations, then exit (needs MIGRATE_DATABASE_DSN)
+python -m app migrate   apply schema migrations, then exit (needs MIGRATE_DATABASE_DSN;
+                        optional MIGRATE_LOCK_TIMEOUT, default 1s)
 
 uvicorn runs in-process so this Python process is PID 1 and receives SIGTERM
 directly. uvicorn then stops accepting connections and lets in-flight
@@ -30,7 +31,7 @@ def run_migrations() -> int:
         log.critical("MIGRATE_DATABASE_DSN is required")
         return 2
     try:
-        migrate(dsn)
+        migrate(dsn, lock_timeout=os.getenv("MIGRATE_LOCK_TIMEOUT", "1s"))
     except MigrationError as exc:
         log.critical(str(exc))
         return 1

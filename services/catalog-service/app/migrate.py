@@ -9,6 +9,9 @@ Runs as a one-off Job before each rollout, with the migrator's credentials
   already applied is an error: write a new migration instead.
 - A PostgreSQL advisory lock makes concurrent runs wait instead of colliding.
 - Re-running is safe: already applied files are skipped.
+- lock_timeout: a migration that can't get its table lock quickly gives up
+  (the Job fails and Kubernetes retries it) instead of waiting in the lock
+  queue, where it would block every read of that table behind it.
 """
 
 import hashlib
@@ -25,6 +28,9 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 FILE_PATTERN = re.compile(r"^V(\d{3})__([a-z0-9_]+)\.sql$")
 # Any fixed number shared by all runners of this service's migrations.
 ADVISORY_LOCK_ID = 7_085_001
+# Must stay below the app's statement_timeout (2s): reads queued behind a
+# waiting migration then wait at most this long and still succeed.
+DEFAULT_LOCK_TIMEOUT = "1s"
 
 
 class MigrationError(RuntimeError):
@@ -54,12 +60,15 @@ def discover(directory: Path = MIGRATIONS_DIR) -> list[Migration]:
     return migrations
 
 
-def migrate(dsn: str, directory: Path = MIGRATIONS_DIR) -> int:
+def migrate(dsn: str, directory: Path = MIGRATIONS_DIR, lock_timeout: str = DEFAULT_LOCK_TIMEOUT) -> int:
     """Applies pending migrations. Returns how many were applied."""
     migrations = discover(directory)
     with psycopg.connect(dsn, autocommit=True, connect_timeout=5) as conn:
+        # Waits for another migration run to finish (bounded by the Job's deadline).
         conn.execute("SELECT pg_advisory_lock(%s)", (ADVISORY_LOCK_ID,))
         try:
+            # From here on, every lock wait (ALTER TABLE, CREATE INDEX, ...) is bounded.
+            conn.execute("SELECT set_config('lock_timeout', %s, false)", (lock_timeout,))
             # Kept out of the public schema, so the app role gets no access to it.
             conn.execute("CREATE SCHEMA IF NOT EXISTS migrations")
             conn.execute("""

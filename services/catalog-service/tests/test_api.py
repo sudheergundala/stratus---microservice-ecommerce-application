@@ -168,3 +168,24 @@ def test_edited_migration_is_refused(dsn, tmp_path):
 def test_migration_missing_from_image_is_refused(dsn, tmp_path):
     with pytest.raises(MigrationError, match="missing from this image"):
         migrate(dsn, tmp_path)
+
+
+
+def test_migration_gives_up_fast_when_the_table_is_busy(dsn, tmp_path):
+    """Regression test for drill D: a migration must not queue behind a
+    running query (and block every later read) for longer than lock_timeout."""
+    for f in MIGRATIONS_DIR.glob("*.sql"):
+        shutil.copy(f, tmp_path)
+    (tmp_path / "V999__add_column.sql").write_text("ALTER TABLE products ADD COLUMN test_only text;")
+    with psycopg.connect(dsn) as reader:
+        # An open transaction that has read the table, like a slow report.
+        reader.execute("SELECT count(*) FROM products")
+        started = time.perf_counter()
+        with pytest.raises(psycopg.errors.LockNotAvailable):
+            migrate(dsn, tmp_path, lock_timeout="500ms")
+        assert time.perf_counter() - started < 3
+    with psycopg.connect(dsn) as conn:
+        # Nothing half-applied: no recorded version, no new column.
+        assert conn.execute("SELECT count(*) FROM migrations.applied WHERE version = 999").fetchone()[0] == 0
+        assert conn.execute("SELECT count(*) FROM information_schema.columns "
+                            "WHERE table_name = 'products' AND column_name = 'test_only'").fetchone()[0] == 0
