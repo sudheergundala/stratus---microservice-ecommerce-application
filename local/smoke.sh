@@ -49,6 +49,11 @@ email_count() {
 }
 
 echo "== Public routes (through the gateway)"
+# The gateway may have just been (re)started: wait until it reports ready.
+for _ in $(seq 1 30); do
+  [[ $(curl -s -o /dev/null -w '%{http_code}' --max-time 2 "$GW/readyz") == 200 ]] && break
+  sleep 1
+done
 check_http "gateway /healthz" 200 public "$GW/healthz"
 
 email="smoke-$(date +%s)@example.com"
@@ -62,9 +67,12 @@ check_http "browse products (gateway -> catalog-service)" 200 public "$GW/api/v1
 first=$(curl -s --max-time 5 "$GW/api/v1/products?q=waterproof" | python3 -c 'import sys, json; i = json.load(sys.stdin)["items"]; print(i[0]["sku"] if i else "none")')
 check_value "search 'waterproof' ranks BTS-002 first" BTS-002 "$first"
 
-order_status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$GW/api/v1/orders/smoke-does-not-exist")
-check_value "orders route reaches order-service (not 502/504)" yes \
-  "$([[ $order_status != 502 && $order_status != 504 && $order_status != 000 ]] && echo yes || echo "no ($order_status)")"
+check_http "orders without a token are refused at the gateway" 401 public "$GW/api/v1/orders/smoke-1"
+order_status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -H "Authorization: Bearer $token" "$GW/api/v1/orders/smoke-1")
+check_value "orders with a token reach order-service (not 401/502/504)" yes \
+  "$([[ $order_status != 401 && $order_status != 502 && $order_status != 504 && $order_status != 000 ]] && echo yes || echo "no ($order_status)")"
+check_http "a customer can't change the catalog" 403 public -X PUT "$GW/api/v1/products/JKT-001" \
+  -H "Authorization: Bearer $token" -H 'content-type: application/json' -d '{}'
 
 echo "== Internal services (from inside the backend network)"
 payment='{"order_id":"smoke_1","amount_cents":4999,"currency":"USD","card_number":"4111111111111111","email":"sam@example.com"}'

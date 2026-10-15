@@ -19,10 +19,15 @@ services:
      build: services/api-gateway
      image: stratus/api-gateway:dev
      environment:
-       USER_SERVICE_URL: http://user-service:8081
-       CATALOG_SERVICE_URL: http://catalog-service:8085
-       ORDER_SERVICE_URL: http://order-service:8082
-       UPSTREAM_TIMEOUT_MS: "3000"
+      USER_SERVICE_URL: http://user-service:8081
+      CATALOG_SERVICE_URL: http://catalog-service:8085
+      ORDER_SERVICE_URL: http://order-service:8082
+      UPSTREAM_TIMEOUT_MS: "3000"
+      # Public keys for verifying tokens; fetched once, then cached.
+      JWKS_URL: http://user-service:8081/.well-known/jwks.json
+      RATE_LIMIT_PER_MINUTE: "120"
+      # Production value is 5; 10 lets the smoke test (2 auth calls) run a few times a minute.
+      AUTH_RATE_LIMIT_PER_MINUTE: "10"
      ports: ["127.0.0.1:8080:8080"]
      networks: [edge, backend]
      depends_on: [user-service, catalog-service, order-service]

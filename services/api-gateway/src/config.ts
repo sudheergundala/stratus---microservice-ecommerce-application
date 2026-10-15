@@ -10,6 +10,22 @@ export interface Config {
   };
   upstreamTimeoutMs: number;
   shutdownTimeoutMs: number;
+  auth: {
+    jwksUrl: string;
+    issuer: string;
+    audience: string;
+    // How long fetched public keys are trusted before they are fetched again.
+    jwksCacheMaxAgeMs: number;
+  };
+  rateLimit: {
+    // Per client IP, per minute, for every route.
+    perMinute: number;
+    // Per client IP, per minute, for login and register (password guessing).
+    authPerMinute: number;
+  };
+  // Number of proxies in front of the gateway (the ALB in AWS = 1). Needed to
+  // read the real client IP from X-Forwarded-For; 0 locally.
+  trustProxyHops: number;
 }
 
 function required(name: string): string {
@@ -42,6 +58,18 @@ function positiveInt(name: string, fallback: number): number {
   return value;
 }
 
+function nonNegativeInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${name} must be a non-negative integer, got "${raw}"`);
+  }
+  return value;
+}
+
 export function loadConfig(): Config {
   return {
     port: positiveInt('PORT', 8080),
@@ -52,5 +80,16 @@ export function loadConfig(): Config {
     },
     upstreamTimeoutMs: positiveInt('UPSTREAM_TIMEOUT_MS', 3000),
     shutdownTimeoutMs: positiveInt('SHUTDOWN_TIMEOUT_MS', 20000),
+    auth: {
+      jwksUrl: url('JWKS_URL'),
+      issuer: process.env.JWT_ISSUER || 'stratus-user-service',
+      audience: process.env.JWT_AUDIENCE || 'stratus-api',
+      jwksCacheMaxAgeMs: positiveInt('JWKS_CACHE_MAX_AGE_SECONDS', 600) * 1000,
+    },
+    rateLimit: {
+      perMinute: positiveInt('RATE_LIMIT_PER_MINUTE', 120),
+      authPerMinute: positiveInt('AUTH_RATE_LIMIT_PER_MINUTE', 5),
+    },
+    trustProxyHops: nonNegativeInt('TRUST_PROXY_HOPS', 0),
   };
 }
