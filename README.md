@@ -22,3 +22,14 @@ catalog, fraud (Python)	     python:3.x-slim              	     Python's distrol
 
 # If there is no Shell, How do you debug?
 Not by baking a shell into the production image. In Kubernetes you attach a temporary debug container next to the running one: kubectl debug -it <pod> --image=busybox --target=<container>.
+
+# Docker compose VS EKS
+
+In compose	                                                       In production (EKS)
+depends_on + one-shot *-migrate services	                    Argo CD PreSync migration Jobs
+read_only, cap_drop, no-new-privileges, tmpfs	               Pod securityContext
+stop_grace_period: 30s	                                        terminationGracePeriodSeconds: 30
+deploy.resources.limits.memory	                              resources.limits.memory
+backend network with internal: true	                         Private subnets plus NetworkPolicy
+Only the gateway published, on 127.0.0.1	                    Only the ALB is public
+postgres, dynamodb-local, sqs-local, ses-local	               RDS, DynamoDB, SQS, SES (Terraform,

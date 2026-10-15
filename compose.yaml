@@ -1,0 +1,200 @@
+name: stratus
+x-hardened: &hardened
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  stop_grace_period: 30s
+  networks: [backend]
+
+x-aws-local: &aws-local
+   AWS_REGION: us-east-1
+   AWS_ACCESS_KEY_ID: local
+   AWS_SECRET_ACCESS_KEY: local
+
+services:
+  api-gateway:
+     <<: *hardened
+     build: services/api-gateway
+     image: stratus/api-gateway:dev
+     environment:
+       USER_SERVICE_URL: http://user-service:8081
+       CATALOG_SERVICE_URL: http://catalog-service:8085
+       ORDER_SERVICE_URL: http://order-service:8082
+       UPSTREAM_TIMEOUT_MS: "3000"
+     ports: ["127.0.0.1:8080:8080"]
+     networks: [edge, backend]
+     depends_on: [user-service, catalog-service, order-service]
+     deploy:
+       resources:
+         limits:
+           memory: 256M
+  user-service:
+    <<: *hardened
+    build: services/user-service
+    image: stratus/user-service:dev
+    environment:
+       ConnectionStrings__usersDb: Host=postgres;Port=5432;Database=users;Username=stratus;Password=local-dev-only;Timeout=3;Maximum Pool Size=10;GSS Encryption Mode=Disable
+       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}
+       REQUEST_TIMEOUT_SECONDS: "2"
+    depends_on: 
+      user-migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+         limits:
+            memory: 256M
+  user-migrate:
+     <<: *hardened
+     build: services/user-service
+     image: stratus/user-service:dev
+     command: ["migrate"]
+     restart: "no"
+     environment: 
+        ConnectionStrings__usersDb: Host=postgres;Port=5432;Database=users;Username=stratus;Password=local-dev-only;Timeout=5;GSS Encryption Mode=Disable
+     depends_on:
+       postgres:
+         condition: service_healthy
+  payment-service:
+     <<: *hardened
+     build: services/payment-service
+     image: stratus/payment-service:dev
+     environment:
+      PROVIDER_API_KEY: local-dev-key
+     deploy: {resources: {limits: {memory: 64M}}}
+  fraud-service:
+    <<: *hardened
+    build: services/fraud-service
+    image: stratus/fraud-service:dev
+    deploy: {resources: {limits: {memory: 256M}}}
+  notification-service:
+     <<: *hardened
+     build: services/notification-service
+     image: stratus/notification-service:dev
+     environment:
+      <<: *aws-local
+      SQS_QUEUE_URL: http://sqs-local:9324/000000000000/stratus-notifications
+      SQS_ENDPOINT: http://sqs-local:9324
+      SES_ENDPOINT: http://ses-local:8005
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      DEDUPE_TABLE: stratus-notification-dedupe
+      EMAIL_FROM: orders@stratus.local
+    # SQS or SES being down is handled by the worker itself (retry with
+    # backoff), so it only waits for its table to exist.
+     depends_on:
+      dynamodb-init: {condition: service_completed_successfully}
+     deploy: {resources: {limits: {memory: 256M}}}
+  catalog-service:
+     <<: *hardened
+     build: services/catalog-service
+     image: stratus/catalog-service:dev
+     environment:
+        DATABASE_DSN: host=postgres port=5432 dbname=catalog user=catalog_app password=local-dev-only-app
+        IMAGE_BASE_URL: https://images.stratus.invalid
+        DB_POOL_TIMEOUT_SECONDS: "1"
+        DB_STATEMENT_TIMEOUT_MS: "1500"
+     depends_on:
+        catalog-migrate:
+           condition: service_completed_successfully
+     deploy:
+        resources:
+          limits:
+            memory: 256M
+  catalog-migrate:
+     <<: *hardened
+     build: services/catalog-service
+     image: stratus/catalog-service:dev
+     command: ["migrate"]
+     restart: "no"
+     environment:
+       MIGRATE_DATABASE_DSN: host=postgres port=5432 dbname=catalog user=catalog_migrator password=local-dev-only-migrator connect_timeout=5
+       MIGRATE_LOCK_TIMEOUT: 1s
+     depends_on:
+        postgres:
+          condition: service_healthy
+  catalog-seed:
+     <<: *hardened
+     image: postgres:17.11
+     entrypoint: ["psql", "-v", "ON_ERROR_STOP=1", "host=postgres dbname=catalog user=catalog_app password=local-dev-only-app", "-f", "/seed/catalog-seed.sql"]
+     restart: "no"
+     volumes: ["./local/catalog-seed.sql:/seed/catalog-seed.sql:ro"]
+     depends_on:
+      catalog-migrate: {condition: service_completed_successfully}
+
+  inventory-service:
+     <<: *hardened
+     build: services/inventory-service
+     image: stratus/inventory-service:dev
+     environment:
+      <<: *aws-local
+      TABLE_NAME: stratus-inventory
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+     depends_on:
+      dynamodb-init: {condition: service_completed_successfully}
+     deploy: {resources: {limits: {memory: 64M}}}
+  order-service:
+     <<: *hardened
+     build: services/order-service
+     image: stratus/order-service:dev
+     environment:
+      PAYMENT_SERVICE_URL: http://payment-service:8083
+      PAYMENT_TIMEOUT: 2s
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+     depends_on: [payment-service]
+    # The JVM sizes its heap from this limit (75% = 384 MB).
+     deploy: {resources: {limits: {memory: 512M}}}
+
+  postgres:
+    image: postgres:17.11
+    environment:
+      POSTGRES_USER: stratus
+      POSTGRES_PASSWORD: local-dev-only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Run once, on the first start with an empty volume.
+      - ./local/postgres-init/10-users.sql:/docker-entrypoint-initdb.d/10-users.sql:ro
+      - ./local/catalog-db-bootstrap.sql:/docker-entrypoint-initdb.d/20-catalog.sql:ro
+    # TCP, not the socket: during first-time init Postgres runs a temporary
+    # server on the socket only, so a socket check would pass too early.
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "stratus", "-d", "postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    ports: ["127.0.0.1:5432:5432"]
+    networks: [edge, backend]
+    restart: unless-stopped
+  dynamodb-local:
+    image: amazon/dynamodb-local:3.3.1
+    networks: [backend]
+    restart: unless-stopped
+  dynamodb-init:
+    image: amazon/aws-cli:2.37.6
+    entrypoint: ["/bin/bash", "/init/dynamodb-init.sh"]
+    environment: *aws-local
+    volumes: ["./local/dynamodb-init.sh:/init/dynamodb-init.sh:ro"]
+    networks: [backend]
+    restart: "no"
+    depends_on: [dynamodb-local]
+  sqs-local:
+     image: softwaremill/elasticmq-native:1.7.1
+     volumes: ["./local/elasticmq.conf:/opt/elasticmq.conf:ro"]
+     networks: [backend]
+     restart: unless-stopped
+  ses-local:
+     image: node:24-slim
+     command: ["npx", "-y", "aws-ses-v2-local@2.10.2", "--host", "0.0.0.0", "--port", "8005"]
+     ports: ["127.0.0.1:8005:8005"]
+    # edge: npx downloads the package from npm at startup.
+     networks: [edge, backend]
+     restart: unless-stopped
+networks:
+    edge:
+      name: stratus-edge
+    backend:
+      name: stratus-backend
+      internal: true
+volumes:
+    pgdata:
